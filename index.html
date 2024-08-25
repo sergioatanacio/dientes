@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Lavado de Dientes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-blue-100 flex items-center justify-center min-h-screen">
+    <div class="text-center">
+        <h1 class="text-3xl font-bold mb-4">Simulador de Lavado de Dientes</h1>
+        <div class="relative inline-block">
+            <canvas id="teethCanvas" width="300" height="300" class="border border-gray-300 bg-white"></canvas>
+            <svg id="toothbrush" class="absolute w-8 h-8 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3 6h18v4H3V6z" fill="currentColor" />
+                <path d="M7 10v8M11 10v8M15 10v8M19 10v8" stroke="currentColor" stroke-width="2" />
+            </svg>
+        </div>
+        <div class="mt-4 w-64 bg-gray-200 rounded-full h-2.5 mx-auto">
+            <div id="cleanProgress" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+        </div>
+        <p id="cleanPercentage" class="mt-2">Limpieza: 0%</p>
+        <p id="levelInfo" class="mt-2">Nivel: 1</p>
+        <button id="resetButton" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">
+            Reiniciar
+        </button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('teethCanvas');
+        const ctx = canvas.getContext('2d');
+        const toothbrush = document.getElementById('toothbrush');
+        const cleanProgress = document.getElementById('cleanProgress');
+        const cleanPercentageText = document.getElementById('cleanPercentage');
+        const levelInfoText = document.getElementById('levelInfo');
+        const resetButton = document.getElementById('resetButton');
+
+        let cleanPixels = new Set();
+        let totalPixels = 0;
+        let level = 1;
+        let brushSize = 15;
+
+        function isTeethPixel(r, g, b) {
+            return (r === 240 && g === 240 && b === 240) || (r === 255 && g === 255 && b === 255);
+        }
+
+        function drawTeeth() {
+            ctx.fillStyle = '#f0f0f0';
+            ctx.beginPath();
+            ctx.moveTo(50, 150);
+            ctx.quadraticCurveTo(150, 50, 250, 150);
+            ctx.quadraticCurveTo(150, 250, 50, 150);
+            ctx.fill();
+
+            for (let i = 0; i < 8; i++) {
+                ctx.beginPath();
+                ctx.arc(75 + i * 25, 150, 10, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.strokeStyle = '#ddd';
+                ctx.stroke();
+            }
+
+            // Count total pixels to clean
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            totalPixels = 0;
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                if (isTeethPixel(imageData.data[i], imageData.data[i+1], imageData.data[i+2])) {
+                    totalPixels++;
+                }
+            }
+        }
+
+        function updateCleaning(x, y) {
+            const imageData = ctx.getImageData(x - brushSize, y - brushSize, brushSize * 2, brushSize * 2);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const px = (i / 4) % (brushSize * 2) + x - brushSize;
+                const py = Math.floor((i / 4) / (brushSize * 2)) + y - brushSize;
+                if (isTeethPixel(imageData.data[i], imageData.data[i+1], imageData.data[i+2])) {
+                    const key = `${px},${py}`;
+                    if (!cleanPixels.has(key)) {
+                        cleanPixels.add(key);
+                        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                        ctx.fillRect(px, py, 1, 1);
+                    }
+                }
+            }
+
+            const cleanPercentage = (cleanPixels.size / totalPixels) * 100;
+            cleanProgress.style.width = `${cleanPercentage}%`;
+            cleanPercentageText.textContent = `Limpieza: ${Math.round(cleanPercentage)}%`;
+
+            if (cleanPercentage >= 99.9) {  // Changed from 100 to 99.9 to account for potential floating point imprecision
+                levelUp();
+            }
+        }
+
+        function levelUp() {
+            level++;
+            brushSize = Math.max(5, brushSize - 2);
+            levelInfoText.textContent = `Nivel: ${level}`;
+            cleanPixels.clear();
+            cleanProgress.style.width = '0%';
+            cleanPercentageText.textContent = 'Limpieza: 0%';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawTeeth();
+            alert(`¡Felicidades! Has subido al nivel ${level}. El cepillo es más pequeño ahora.`);
+        }
+
+        function handleBrushing(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            toothbrush.style.left = `${x}px`;
+            toothbrush.style.top = `${y}px`;
+
+            updateCleaning(x, y);
+        }
+
+        canvas.addEventListener('mousemove', handleBrushing);
+
+        resetButton.addEventListener('click', () => {
+            level = 1;
+            brushSize = 15;
+            cleanPixels.clear();
+            cleanProgress.style.width = '0%';
+            cleanPercentageText.textContent = 'Limpieza: 0%';
+            levelInfoText.textContent = 'Nivel: 1';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawTeeth();
+        });
+
+        drawTeeth();
+    </script>
+</body>
+</html>
